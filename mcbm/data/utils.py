@@ -1,4 +1,5 @@
 import os
+import re
 from functools import cache
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from torchvision import models, transforms
 from mcbm.data.data_cub import CUBDataset
 from mcbm.data.data_imagenet import ImageNetDataset
 from mcbm.data.data_isic import ISIC2018Dataset
+from mcbm.data.data_mydata import MyDataset
 
 
 DATASET_FOLDER = os.environ.get("DATASET_FOLDER", "datasets")
@@ -22,6 +24,7 @@ DATASET_ROOTS = {
     "isic2018_train": f"{DATASET_FOLDER}/ISIC2018/ISIC2018_Task3_Training_Input/",
     "isic2018_val": f"{DATASET_FOLDER}/ISIC2018/ISIC2018_Task3_Validation_Input/",
     "isic2018_test": f"{DATASET_FOLDER}/ISIC2018/ISIC2018_Task3_Test_Input/",
+    "palate": f"{DATASET_FOLDER}/medic_data_add_dedup",
 }
 
 ISIC_LABEL_FILES = {
@@ -30,20 +33,35 @@ ISIC_LABEL_FILES = {
     "isic2018_test": f"{DATASET_FOLDER}/ISIC2018/ISIC2018_Task3_Test_GroundTruth/ISIC2018_Task3_Test_GroundTruth.csv",
 }
 
+MYDATA_ROOT = f"{DATASET_FOLDER}/medic_data_add_dedup"
+MYDATA_IMAGE_DIR = DATASET_FOLDER # CSVファイルにそのまま書いてあるからいらないかも
+MYDATA_CSV = f"{MYDATA_ROOT}/medic_data_add_dedup_v1.csv"
+
 LABEL_FILES = {
     "imagenet": "mcbm/data/class_names/imagenet.txt",
     "cub": "mcbm/data/class_names/cub.txt",
     "isic2018": "mcbm/data/class_names/isic2018.txt",
+    "mydata": "mcbm/data/class_names/mydata.txt",
 }
 
 DATASET_DOMAINS = {
     "cub": "bird species classification",
     "isic2018": "dermoscopic images of pigmented skin lesions",
     "imagenet": "imagenet classification",
+    "mydata": "TODO: describe your image domain",
 }
+
+FOLD_PATTERN = re.compile(r"^(?P<base>.+)_fold(?P<fold>\d+)$")
+
+
+def strip_fold(name):
+    """'mydata_fold2' -> 'mydata', 'resnet50_mydata_fold2' -> 'resnet50_mydata'."""
+    match = FOLD_PATTERN.match(name)
+    return match.group("base") if match else name
 
 
 def get_dataset_domain(dataset_name):
+    dataset_name = strip_fold(dataset_name)
     if dataset_name not in DATASET_DOMAINS:
         raise ValueError(
             f"No domain is defined for dataset '{dataset_name}'. "
@@ -93,6 +111,9 @@ class ResizeCenterCrop:
 
 
 def get_llm_image_transform(target_name):
+    target_name = strip_fold(target_name)
+    if target_name == "resnet50_mydata":
+        return ResizeCenterCrop(resize_size=256, crop_size=224)
     if target_name in {"resnet18_cub", "resnet50"}:
         return ResizeCenterCrop(resize_size=256, crop_size=224)
     if target_name == "resnet50_isic2018":
@@ -110,6 +131,20 @@ def get_image_path(dataset_name, split, image_name):
 
 
 def get_data(dataset_name, preprocess=None):
+    if dataset_name.startswith("mydata"):
+        if "train" in dataset_name:
+            split = "train"
+        elif "val" in dataset_name or "test" in dataset_name:
+            split = "val"
+        else:
+            raise ValueError(f"Unknown split in mydata dataset name: {dataset_name}")
+        return MyDataset(
+            MYDATA_IMAGE_DIR,
+            MYDATA_CSV,
+            split=split,
+            transform=preprocess,
+        )
+
     if dataset_name.startswith("isic2018"):
         return ISIC2018Dataset(
             DATASET_ROOTS[dataset_name],
@@ -163,6 +198,13 @@ def split_train_dataset(train_dataset, val_split, seed):
 
 
 def get_official_data_splits(dataset_name, preprocess=None):
+    if dataset_name == "mydata":
+        return {
+            "train": get_data("mydata_train", preprocess),
+            "val": None,
+            "test": get_data("mydata_val", preprocess),
+        }
+
     if dataset_name == "imagenet":
         return {
             "train": get_data("imagenet_train", preprocess),
@@ -204,6 +246,13 @@ def get_activation_splits(dataset_name, preprocess, val_split, seed):
 
 
 def get_target_model(target_name, device):
+    if strip_fold(target_name) == "resnet50_mydata":
+        # Fold-specific model trained only on that fold's train split (no test leakage).
+        checkpoint_path = CHECKPOINT_FOLDER / f"{target_name}.pth"
+        target_model = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        target_model.eval()
+        return target_model, get_resnet_imagenet_preprocess()
+
     if target_name == "resnet18_cub":
         target_model = ptcv_get_model("resnet18_cub", pretrained=True).to(device)
         target_model.eval()
@@ -225,5 +274,5 @@ def get_target_model(target_name, device):
 
 
 def get_classes(dataset_name):
-    with open(LABEL_FILES[dataset_name], "r") as f:
+    with open(LABEL_FILES[strip_fold(dataset_name)], "r") as f:
         return f.read().split("\n")
