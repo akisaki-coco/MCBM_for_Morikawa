@@ -634,7 +634,7 @@ def call_ollama_namer(args, config, examples, classes_found):
     )
 
     # ここで，chat.completions.createを使って，プロンプトを送信する
-    response = client.chat.conpletions.create(
+    response = client.chat.completions.create(
         # コマンドラインで指定されたLLMモデル
         model = args.llm_model,
 
