@@ -255,16 +255,39 @@ def get_target_model(target_name, device):
     if strip_fold(target_name) == "resnet50_mydata":
         checkpoint_path = CHECKPOINT_FOLDER / f"{target_name}.pth"
         checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-        if isinstance(checkpoint, torch.nn.Module):
-            target_model = checkpoint.to(device)
-        else:
-            state_dict = checkpoint.get("state_dict", checkpoint.get("model_state_dict", checkpoint))
-            num_classes = state_dict["fc.weight"].shape[0]
-            target_model = models.resnet50(weights=None)
-            target_model.fc = torch.nn.Linear(target_model.fc.in_features, num_classes)
-            target_model.load_state_dict(state_dict)
-            target_model = target_model.to(device)
-        target_model.eval()
+        state_dict = checkpoint.get("state_dict", checkpoint.get("model_state_dict", checkpoint))
+
+        # Sequential化されたキー名 (backbone.0〜7, head) を標準ResNet50のキー名に変換
+        prefix_map = {
+            "backbone.0.": "conv1.",
+            "backbone.1.": "bn1.",
+            "backbone.4.": "layer1.",
+            "backbone.5.": "layer2.",
+            "backbone.6.": "layer3.",
+            "backbone.7.": "layer4.",
+            "head.": "fc.",
+        }
+        mapped_state_dict = {}
+        for k, v in state_dict.items():
+            for old_prefix, new_prefix in prefix_map.items():
+                if k.startswith(old_prefix):
+                    k = new_prefix + k[len(old_prefix):]
+                    break
+            mapped_state_dict[k] = v
+
+        # もし2値分類が1出力 (BCEWithLogitsLoss) で学習されていた場合、
+        # train_sae.py の CrossEntropyLoss と数学的に等価な2出力 [0, z] に変換する
+        if mapped_state_dict["fc.weight"].shape[0] == 1:
+            w = mapped_state_dict["fc.weight"]
+            b = mapped_state_dict["fc.bias"]
+            mapped_state_dict["fc.weight"] = torch.cat([torch.zeros_like(w), w], dim=0)
+            mapped_state_dict["fc.bias"] = torch.cat([torch.zeros_like(b), b], dim=0)
+
+        num_classes = mapped_state_dict["fc.weight"].shape[0]
+        target_model = models.resnet50(weights=None)
+        target_model.fc = torch.nn.Linear(target_model.fc.in_features, num_classes)
+        target_model.load_state_dict(mapped_state_dict)
+        target_model = target_model.to(device).eval()
         return target_model, get_resnet_imagenet_preprocess()
     
     if target_name == "resnet18_cub":
