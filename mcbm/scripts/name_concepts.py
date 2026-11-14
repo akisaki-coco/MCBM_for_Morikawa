@@ -8,6 +8,8 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+import requests
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -672,6 +674,35 @@ def call_ollama_namer(args, config, examples, classes_found):
     concept_name = parse_concept_name_json(json_response)
 
     return concept_name
+
+def call_ollama_namer(args, config, examples, classes_found):
+    # Ollama ネイティブ API 用にメッセージを構築
+    images = [image_to_jpeg_bytes(ex["image"]) for ex in examples]
+    
+    # 20枚の画像バイト列を Base64 文字列のリストにする
+    base64_images = [base64.b64encode(img).decode("utf-8") for img in images]
+    prompt_text = build_prompt_before_images() + "\n"
+    for index, ex in enumerate(examples, start=1):
+        prompt_text += f"Image {index}, Activation: {ex['activation']:.2f}\n"
+    prompt_text += build_prompt_after_images(classes_found)
+    payload = {
+        "model": args.llm_model,
+        "messages": [
+            {"role": "system", "content": get_system_prompt(config)},
+            {"role": "user", "content": prompt_text, "images": base64_images},
+        ],
+        "format": CONCEPT_NAME_SCHEMA,
+        "options": {
+            "temperature": 0,
+        },
+        "think": False,  # ネイティブ API なら確実に思考がオフになる
+        "stream": False,
+    }
+    res = requests.post("http://localhost:11434/api/chat", json=payload)
+    res.raise_for_status()
+    data = res.json()
+    
+    return parse_concept_name_json(data["message"]["content"])
 
 
 
