@@ -246,13 +246,27 @@ def get_activation_splits(dataset_name, preprocess, val_split, seed):
 
 
 def get_target_model(target_name, device):
+    # if strip_fold(target_name) == "resnet50_mydata":
+    #     # Fold-specific model trained only on that fold's train split (no test leakage).
+    #     checkpoint_path = CHECKPOINT_FOLDER / f"{target_name}.pth"
+    #     target_model = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    #     target_model.eval()
+    #     return target_model, get_resnet_imagenet_preprocess()
     if strip_fold(target_name) == "resnet50_mydata":
-        # Fold-specific model trained only on that fold's train split (no test leakage).
         checkpoint_path = CHECKPOINT_FOLDER / f"{target_name}.pth"
-        target_model = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        if isinstance(checkpoint, torch.nn.Module):
+            target_model = checkpoint.to(device)
+        else:
+            state_dict = checkpoint.get("state_dict", checkpoint.get("model_state_dict", checkpoint))
+            num_classes = state_dict["fc.weight"].shape[0]
+            target_model = models.resnet50(weights=None)
+            target_model.fc = torch.nn.Linear(target_model.fc.in_features, num_classes)
+            target_model.load_state_dict(state_dict)
+            target_model = target_model.to(device)
         target_model.eval()
         return target_model, get_resnet_imagenet_preprocess()
-
+    
     if target_name == "resnet18_cub":
         target_model = ptcv_get_model("resnet18_cub", pretrained=True).to(device)
         target_model.eval()
