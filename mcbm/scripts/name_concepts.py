@@ -43,7 +43,9 @@ def parse_args():
     parser.add_argument("--output-dir", help="Directory for concept naming outputs.")
     parser.add_argument("--device", help="Torch device override, e.g. cuda, cuda:0, or cpu.")
     parser.add_argument("--save-images", action="store_true", help="Save the 20 rendered naming images for debugging.")
-    parser.add_argument("--llm-provider", choices=["openai", "gemini"], default="openai", help="LLM provider.")
+    # ollamaを動かす時のオプションを追加
+    # keys.envファイルを参照しないルートを追加するため
+    parser.add_argument("--llm-provider", choices=["openai", "gemini", "ollama"], default="openai", help="LLM provider.")
     parser.add_argument("--llm-model", default="gpt-4.1", help="LLM model name for concept naming.")
     parser.add_argument("--reasoning-effort", choices=["none", "minimal", "low", "medium", "high", "xhigh"])
     parser.add_argument("--thinking-level", choices=["minimal", "low", "medium", "high"])
@@ -56,6 +58,8 @@ def validate_llm_options(args):
         raise ValueError("--thinking-level is only supported with --llm-provider gemini.")
     if args.llm_provider == "gemini" and args.reasoning_effort is not None:
         raise ValueError("--reasoning-effort is only supported with --llm-provider openai.")
+    if args.llm_provider == "ollama" and (args.reasoning_effort is not None or args.thinking_level is not None):
+        raise ValueError("--reasoning-effort and --thinking-level are not supported with --llm-provider ollama.")
 
 
 def parse_units(value):
@@ -348,7 +352,7 @@ def save_run_info(path, config, args, checkpoint, activation_dir):
     if args.llm_provider == "openai":
         run_info["reasoning_effort"] = args.reasoning_effort
         run_info["image_detail"] = openai_image_detail(args.llm_model)
-    else:
+    elif args.llm_provider == "gemini":
         run_info["thinking_level"] = args.thinking_level
     path.write_text(json.dumps(run_info, indent=2))
 
@@ -463,6 +467,9 @@ def resolve_api_key(provider="openai"):
         key_name = "OPENAI_API_KEY"
     elif provider == "gemini":
         key_name = "GEMINI_API_KEY"
+    elif provider == "ollama":
+        # ollama用のダミーデータを入れる
+        key_name = "OLLAMA_API_KEY"
     else:
         raise ValueError(f"Unsupported LLM provider: {provider}")
     api_key = keys.get(key_name)
@@ -594,12 +601,87 @@ def call_gemini_namer(args, config, examples, classes_found):
     )
     return parse_concept_name_json(response.text)
 
+# ollamaでSAEのニューロンに名前をつけるための関数
+# argsはコマンドラインの引数
+# configはデータセットの設定
+# exampleはニューロンが強く反応した画像としなかった画像のリスト
+# classes_foundは反応した画像のクラス名のリスト，クラス名が名前にならないようにするため
+def call_ollama_namer(args, config, examples, classes_found):
+    # プロンプトの作成
+    # 型はテキストで，テキストの中身はbuild_prompt_before_images()に書いてある
+    content = [{"type": "text", "text": build_prompt_before_images()}]
+
+    for index, example in enumerate(examples, start=1):
+        # テキストで，画像の番号とニューロンの活性化値を渡す
+        # 番号はノイズじゃないのか？
+        content.append({"type": "text", "text": f"Image {index}, Activation: {example['activation']:.2f}"})
+
+        # 対応する画像を渡す（お約束の書き方）
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": image_to_data_url(example["image"])}
+            }
+        )
+
+    # 最後に，概念名をつけてねというプロンプトを渡す
+    # ここでclasses_foundを渡すことで，クラス名が概念名にならないようにする
+    content.append({"type": "text", "text": build_prompt_after_images(classes_found)})
+
+    client = OpenAI(
+        base_url = "http://localhost:11434/v1",  # ollamaのローカルサーバーのURL
+        api_key = "ollama"  # ollamaのAPIキー（ダミー） 
+    )
+
+    # ここで，chat.completions.createを使って，プロンプトを送信する
+    response = client.chat.conpletions.create(
+        # コマンドラインで指定されたLLMモデル
+        model = args.llm_model,
+
+        # プロンプトの内容
+        messages = [
+            # role:systemはシステムの指示，ルールや役割を指定する
+            {"role": "system", "content": get_system_prompt(config)},
+
+            # role:userはユーザーの指示，実際にやってほしいことを指定する
+            {"role": "user", "content": content}
+        ],
+
+        # ランダム性の制御，0にすると常に確率が最大のものを選ぶ
+        temperature = 0,
+
+        # 返答の形式を指定
+        response_format = {
+            "type": "json_schema",
+            # CONCEPT_NAME_SCHEMAを使って，返答が{"concept_name": "..." }の形式になるように指定
+            "json_schema": {
+                "name": "concept_name_output",
+                "strict": True,
+                "schema": CONCEPT_NAME_SCHEMA
+            }
+        },
+
+        # thinkingをFalseにして，推論時間の短縮
+        extra_body = {"think": False}
+    )
+
+    # 返答のうち，モデルが出力したテキスト部分だけを取り出す
+    json_response = response.choices[0].message.content
+    
+    # parse_conncept_name_jsonを使って，返答のJSONからconcept_nameを取り出す
+    concept_name = parse_concept_name_json(json_response)
+
+    return concept_name
+
+
 
 def call_namer(args, config, examples, classes_found):
     if args.llm_provider == "openai":
         return call_openai_namer(args, config, examples, classes_found)
     if args.llm_provider == "gemini":
         return call_gemini_namer(args, config, examples, classes_found)
+    if args.llm_provider == "ollama":
+        return call_ollama_namer(args, config, examples, classes_found)
     raise ValueError(f"Unsupported LLM provider: {args.llm_provider}")
 
 
@@ -617,7 +699,8 @@ def call_namer_with_retry(args, config, examples, classes_found):
 
 
 def make_concept_run_name(config, args):
-    model_name = f"{args.llm_provider}_{args.llm_model}".replace(".", "_").replace("-", "_")
+    # replaceで"."や"-"や":"を"_"に置き換えることで、ファイル名として使えるようにする
+    model_name = f"{args.llm_provider}_{args.llm_model}".replace(".", "_").replace("-", "_").replace(":", "_")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return f"concepts_{config['dataset']}_{model_name}_{timestamp}"
 
