@@ -42,8 +42,8 @@ def save_japanized_concepts(japanized_concepts, output_path):
 
 def main():
     # CSVファイルのパスを指定
-    csv_path = "/outputs/concepts/mydata/concepts_mydata_ollama_qwen3_5_27b_20261115_075936/concept_names.csv"
-    output_path = "/outputs/concepts/mydata/concepts_mydata_ollama_qwen3_5_27b_20261115_075936/concept_names_japanize.csv"
+    csv_path = "outputs/concepts/mydata/concepts_mydata_ollama_qwen3_5_27b_20261115_075936/concept_names.csv"
+    output_path = "outputs/concepts/mydata/concepts_mydata_ollama_qwen3_5_27b_20261115_075936/concept_names_japanize.csv"
 
     # 概念名を抽出
     concept_names = concept_extract(csv_path)
