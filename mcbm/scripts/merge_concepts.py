@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument("--config", required=True, help="Path to dataset config JSON.")
     parser.add_argument("--concept-dir", required=True, help="Concept naming run directory.")
     parser.add_argument("--output-dir", help="Directory for merged concept outputs.")
-    parser.add_argument("--embedding-provider", choices=["openai", "gemini"], default="openai")
+    parser.add_argument("--embedding-provider", choices=["openai", "gemini", "ollama"], default="ollama")
     parser.add_argument("--embedding-model", default=DEFAULT_OPENAI_EMBEDDING_MODEL)
     return parser.parse_args()
 
@@ -137,6 +137,16 @@ def get_gemini_embeddings(concepts, model):
         embeddings.append(response.embeddings[0].values)
     return np.array(embeddings, dtype=np.float32)
 
+def get_ollama_embeddings(concepts, model):
+    # Ollamaは認証不要。OpenAI SDKの引数上ダミーのキーを渡す
+    client = OpenAI(
+        base_url="http://localhost:11434/v1",
+        api_key="ollama",
+    )
+    # inputにリストを渡すと、入力順に同じ個数のベクトルが返る
+    response = client.embeddings.create(model=model, input=concepts)
+    embeddings = [item.embedding for item in response.data]
+    return np.array(embeddings, dtype=np.float32)
 
 def get_embeddings(concepts, provider, model):
     if provider == "openai":
@@ -145,6 +155,10 @@ def get_embeddings(concepts, provider, model):
         if model == DEFAULT_OPENAI_EMBEDDING_MODEL:
             raise ValueError("Specify --embedding-model when using --embedding-provider gemini.")
         return get_gemini_embeddings(concepts, model)
+    if provider == "ollama":
+        if model == DEFAULT_OPENAI_EMBEDDING_MODEL:
+            raise ValueError("Specify --embedding-model when using --embedding-provider ollama.")
+        return get_ollama_embeddings(concepts, model)
     raise ValueError(f"Unsupported embedding provider: {provider}")
 
 
