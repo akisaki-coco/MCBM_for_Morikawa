@@ -48,7 +48,7 @@ DATASET_DOMAINS = {
     "cub": "bird species classification",
     "isic2018": "dermoscopic images of pigmented skin lesions",
     "imagenet": "imagenet classification",
-    "mydata": "TODO: describe your image domain",
+    "mydata": "medical images of palate",
 }
 
 FOLD_PATTERN = re.compile(r"^(?P<base>.+)_fold(?P<fold>\d+)$")

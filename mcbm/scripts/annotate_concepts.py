@@ -354,7 +354,7 @@ def call_ollama_annotator(args, config, concept_name, reference_grid, task_grid)
                 "schema": ANNOTATION_SCHEMA,
             },
         },
-        # reasoning_effort="none",
+        reasoning_effort="none",
     )
     return parse_predictions_json(response.choices[0].message.content)
 
