@@ -910,13 +910,6 @@ def annotate_concepts(config, args, activation_dir, sae_dir, concepts_path, devi
                 print(f"Skipping concept {concept_id}: not enough active or non-active images.")
                 continue
 
-            # 混同行列を出してみる
-            tp = sum(e == 1 and l == 1 for e, l in zip(expected_labels, llm_labels))
-            fp = sum(e == 0 and l == 1 for e, l in zip(expected_labels, llm_labels))
-            fn = sum(e == 1 and l == 0 for e, l in zip(expected_labels, llm_labels))
-            tn = sum(e == 0 and l == 0 for e, l in zip(expected_labels, llm_labels))
-            print(f"TP={tp} FP={fp} FN={fn} TN={tn}")
-
             if use_small_test_batch:
                 active_indices, similar_indices, random_indices = selected
             else:
@@ -965,6 +958,14 @@ def annotate_concepts(config, args, activation_dir, sae_dir, concepts_path, devi
                 int(expected_label == llm_label)
                 for expected_label, llm_label in zip(expected_labels, llm_labels)
             )
+
+            # 混同行列を出してみる
+            tp = sum(e == 1 and l == 1 for e, l in zip(expected_labels, llm_labels))
+            fp = sum(e == 0 and l == 1 for e, l in zip(expected_labels, llm_labels))
+            fn = sum(e == 1 and l == 0 for e, l in zip(expected_labels, llm_labels))
+            tn = sum(e == 0 and l == 0 for e, l in zip(expected_labels, llm_labels))
+            print(f"TP={tp} FP={fp} FN={fn} TN={tn}")
+
             agreement = matches / len(expected_labels)
             summary[concept_id] = {
                 "concept_id": concept_id,
