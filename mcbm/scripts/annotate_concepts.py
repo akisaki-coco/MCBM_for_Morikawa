@@ -313,70 +313,49 @@ def call_gemini_annotator(args, config, concept_name, reference_grid, task_grid)
 def call_ollama_annotator(args, config, concept_name, reference_grid, task_grid):
     client = OpenAI(
         base_url="http://localhost:11434/v1",
-        api_key="ollama" # ダミー用キー
+        api_key="ollama",  # ダミー用キー
     )
 
-    # image_detail = openai_image_detail(args.llm_model)
-    request = {
-        "model": args.llm_model,
-        "text": {
-            "format": {
-                "type": "json_schema",
-                "name": "concept_annotation_output",
-                "strict": True,
-                "schema": ANNOTATION_SCHEMA,
-            }
-        },
-        "input": [
-            {
-                "role": "system",
-                "content": [{"type": "input_text", "text": get_system_prompt(config)}],
-            },
+    response = client.chat.completions.create(
+        model=args.llm_model,
+        messages=[
+            {"role": "system", "content": get_system_prompt(config)},
             {
                 "role": "user",
                 "content": [
                     {
-                        "type": "input_text",
+                        "type": "text",
                         "text": (
                             "We're studying neurons in a neural network. Each neuron looks for a particular concept in an image.\n"
                             f"Below are 25 reference images (not to label) that strongly contain the concept '{concept_name}'.\n"
                             "Carefully review these reference examples before starting the main task."
                         ),
                     },
-                    {"type": "image_url", "image_url": image_to_data_url(reference_grid)},
+                    {"type": "image_url", "image_url": {"url": image_to_data_url(reference_grid)}},
                     {
-                        "type": "input_text",
+                        "type": "text",
                         "text": (
                             f"Now, here are {IMAGES_PER_BATCH} new images in a 5x5 grid. Read left to right, top to bottom.\n"
                             f"For each image, predict '1' if the concept '{concept_name}' is present, or '0' if absent.\n"
                             "Return a JSON object with one key, labels, containing the 25 labels in order."
                         ),
                     },
-                    {"type": "image_url", "image_url": image_to_data_url(task_grid)},
+                    {"type": "image_url", "image_url": {"url": image_to_data_url(task_grid)}},
                 ],
             },
         ],
-        "response_format": {
-            "type":"json_schema",
-            "json_schema":{
-                "name":"concept_annotation_output",
-                "strict":True,
+        temperature=0,
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "concept_annotation_output",
+                "strict": True,
                 "schema": ANNOTATION_SCHEMA,
-            }
+            },
         },
-
-        "temperature": 0,
-        "reasoning_effort": "none",
-        "extra_body": {"think": False}
-    }
-
-    if args.reasoning_effort is not None:
-        request["reasoning"] = {"effort": args.reasoning_effort}
-    else:
-        request["temperature"] = 0
-
-    response = client.responses.create(**request)
-    return parse_predictions_json(response.output_text)
+        reasoning_effort="none",
+    )
+    return parse_predictions_json(response.choices[0].message.content)
 
 
 def call_annotator(args, config, concept_name, reference_grid, task_grid):
