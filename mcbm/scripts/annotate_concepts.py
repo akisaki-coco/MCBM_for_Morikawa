@@ -57,7 +57,7 @@ def parse_args():
     )
     parser.add_argument("--output-dir", help="Directory for annotation outputs.")
     parser.add_argument("--device", help="Torch device override, e.g. cuda or cuda:0.")
-    parser.add_argument("--llm-provider", choices=["openai", "gemini"], default="openai", help="LLM provider.")
+    parser.add_argument("--llm-provider", choices=["openai", "gemini", "ollama"], default="ollama", help="LLM provider.")
     parser.add_argument("--llm-model", default="gpt-4.1", help="LLM model name for annotation.")
     parser.add_argument("--reasoning-effort", choices=["none", "minimal", "low", "medium", "high", "xhigh"])
     parser.add_argument("--thinking-level", choices=["minimal", "low", "medium", "high"])
@@ -310,12 +310,82 @@ def call_gemini_annotator(args, config, concept_name, reference_grid, task_grid)
             time.sleep(GEMINI_TRANSIENT_ERROR_DELAY_SECONDS)
     return parse_predictions_json(response.text)
 
+def call_ollama_annotator(args, config, concept_name, reference_grid, task_grid):
+    client = OpenAI(
+        base_url="http://localhost:11434/v1",
+        api_key="ollama" # ダミー用キー
+    )
+
+    # image_detail = openai_image_detail(args.llm_model)
+    request = {
+        "model": args.llm_model,
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": "concept_annotation_output",
+                "strict": True,
+                "schema": ANNOTATION_SCHEMA,
+            }
+        },
+        "input": [
+            {
+                "role": "system",
+                "content": [{"type": "input_text", "text": get_system_prompt(config)}],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": (
+                            "We're studying neurons in a neural network. Each neuron looks for a particular concept in an image.\n"
+                            f"Below are 25 reference images (not to label) that strongly contain the concept '{concept_name}'.\n"
+                            "Carefully review these reference examples before starting the main task."
+                        ),
+                    },
+                    {"type": "image_url", "image_url": image_to_data_url(reference_grid)},
+                    {
+                        "type": "input_text",
+                        "text": (
+                            f"Now, here are {IMAGES_PER_BATCH} new images in a 5x5 grid. Read left to right, top to bottom.\n"
+                            f"For each image, predict '1' if the concept '{concept_name}' is present, or '0' if absent.\n"
+                            "Return a JSON object with one key, labels, containing the 25 labels in order."
+                        ),
+                    },
+                    {"type": "image_url", "image_url": image_to_data_url(task_grid)},
+                ],
+            },
+        ],
+        "response_format": {
+            "type":"json_schema",
+            "json_schema":{
+                "name":"concept_annotation_output",
+                "strict":True,
+                "schema": ANNOTATION_SCHEMA,
+            }
+        },
+
+        "temperature": 0,
+        "reasoning_effort": "none",
+        "extra_body": {"think": False}
+    }
+
+    if args.reasoning_effort is not None:
+        request["reasoning"] = {"effort": args.reasoning_effort}
+    else:
+        request["temperature"] = 0
+
+    response = client.responses.create(**request)
+    return parse_predictions_json(response.output_text)
+
 
 def call_annotator(args, config, concept_name, reference_grid, task_grid):
     if args.llm_provider == "openai":
         return call_openai_annotator(args, config, concept_name, reference_grid, task_grid)
     if args.llm_provider == "gemini":
         return call_gemini_annotator(args, config, concept_name, reference_grid, task_grid)
+    if args.llm_provider == "ollama":
+        return call_ollama_annotator(args, config, concept_name, reference_grid, task_grid)
     raise ValueError(f"Unsupported LLM provider: {args.llm_provider}")
 
 
@@ -738,13 +808,14 @@ def save_run_info(path, config, args, activation_dir, sae_dir, checkpoint):
     if args.llm_provider == "openai":
         run_info["reasoning_effort"] = args.reasoning_effort
         run_info["image_detail"] = openai_image_detail(args.llm_model)
-    else:
+    elif args.llm_provider == "gemini":
         run_info["thinking_level"] = args.thinking_level
+    
     path.write_text(json.dumps(run_info, indent=2))
 
 
 def make_annotation_run_name(config, args):
-    model_name = f"{args.llm_provider}_{args.llm_model}".replace(".", "_").replace("-", "_")
+    model_name = f"{args.llm_provider}_{args.llm_model}".replace(".", "_").replace("-", "_").replace(":", "_")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return f"annotations_{config['dataset']}_{model_name}_{timestamp}"
 

@@ -18,7 +18,7 @@ def concept_japanize(concept_names):
 
     japanized_concepts = []
     for concept in concept_names:
-        prompt = f"次の英語の概念を日本語に翻訳してください: '{concept}'"
+        prompt = f"次の英語の概念を日本語の単語に翻訳してください: '{concept}'"
         response = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": "You are a translation assistant that translates English concepts into Japanese."},
