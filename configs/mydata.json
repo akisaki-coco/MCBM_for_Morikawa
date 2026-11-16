@@ -13,5 +13,8 @@
     "sae_patience": 50,
     "sae_ce_drop_tolerance": 0.01,
     "sae_min_active_images": 25,
-    "seed": 42
+    "seed": 42,
+    "annotation_train_samples": 700,
+    "annotation_test_samples": 300,
+    "merge_similarity_threshold": 0.98
 }
