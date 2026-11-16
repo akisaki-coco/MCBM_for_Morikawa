@@ -345,6 +345,7 @@ def call_ollama_annotator(args, config, concept_name, reference_grid, task_grid)
             },
         ],
         temperature=0,
+        max_tokens=10000,
         response_format={
             "type": "json_schema",
             "json_schema": {
@@ -353,7 +354,7 @@ def call_ollama_annotator(args, config, concept_name, reference_grid, task_grid)
                 "schema": ANNOTATION_SCHEMA,
             },
         },
-        reasoning_effort="none",
+        # reasoning_effort="none",
     )
     return parse_predictions_json(response.choices[0].message.content)
 
@@ -908,6 +909,13 @@ def annotate_concepts(config, args, activation_dir, sae_dir, concepts_path, devi
             if selected is None:
                 print(f"Skipping concept {concept_id}: not enough active or non-active images.")
                 continue
+
+            # 混同行列を出してみる
+            tp = sum(e == 1 and l == 1 for e, l in zip(expected_labels, llm_labels))
+            fp = sum(e == 0 and l == 1 for e, l in zip(expected_labels, llm_labels))
+            fn = sum(e == 1 and l == 0 for e, l in zip(expected_labels, llm_labels))
+            tn = sum(e == 0 and l == 0 for e, l in zip(expected_labels, llm_labels))
+            print(f"TP={tp} FP={fp} FN={fn} TN={tn}")
 
             if use_small_test_batch:
                 active_indices, similar_indices, random_indices = selected
