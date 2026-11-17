@@ -6,7 +6,7 @@
     "device": "cuda",
     "num_workers": 4,
     "sae_expansion_factor": 2,
-    "sae_l1_coefficient": 0.0005,
+    "sae_l1_coefficient": 0.00005,
     "sae_learning_rate": 0.0001,
     "sae_batch_size": 32,
     "sae_epochs": 1000,
