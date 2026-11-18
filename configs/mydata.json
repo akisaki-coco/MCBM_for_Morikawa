@@ -5,6 +5,24 @@
     "feature_layer": "layer4",
     "device": "cuda",
     "num_workers": 4,
+
+    "cbl_hidden_layers": 0,
+    "cbl_batch_size": 32,
+    "cbl_epochs": 75,
+    "cbl_patience": 15,
+    "cbl_weight_decay": 1e-5,
+    "cbl_lr": 0.0005,
+    "cbl_optimizer": "adam",
+    "cbl_stratification": true,
+    "cbl_val_split": 0.1,
+    "cbl_auto_weight": true,
+
+    "saga_auto_weight": false,
+    "saga_batch_size": 32,
+    "saga_step_size": 0.1,
+    "saga_lam": 0.001,
+    "saga_n_iters": 5000,
+
     "sae_expansion_factor": 1,
     "sae_l1_coefficient": 0.0001,
     "sae_learning_rate": 0.0001,
@@ -16,5 +34,6 @@
     "seed": 42,
     "annotation_train_samples": 700,
     "annotation_test_samples": 300,
-    "merge_similarity_threshold": 0.98
+    "merge_similarity_threshold": 0.98,
+    "data_parallel": false
 }

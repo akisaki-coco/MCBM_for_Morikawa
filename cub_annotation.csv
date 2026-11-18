@@ -1,0 +1,264 @@
+concept_id,concept_name,llm_sae_agreement,n_samples
+0,sayornis bird,0.7033333333333334,300
+1,crest,0.5433333333333333,300
+2,black throated sparrow,0.5933333333333334,300
+3,gadwall duck,0.58,300
+4,swainson's warbler,0.6233333333333333,300
+5,yellow cap,0.6266666666666667,150
+6,caspian tern,0.71,200
+7,mallard duck,0.5833333333333334,300
+8,yellow bellied flycatcher,0.6366666666666667,300
+9,brewer's sparrow,0.6266666666666667,300
+10,groove-billed ani,0.59,300
+11,white neck collar on black bird,0.53,300
+12,black head and orange body bird,0.65,300
+13,sparrow,0.792,250
+14,lincoln's sparrow,0.65,300
+15,great crested flycatcher,0.705,200
+16,green jay,0.6733333333333333,150
+17,yellow-breasted chat,0.66,300
+18,black and yellow bird with pointed beak,0.68,200
+19,slaty backed gull,0.69,100
+20,tern,0.7733333333333333,300
+21,vesper sparrow,0.6466666666666666,300
+22,pigeon guillemot,0.61,300
+23,black and white warbler,0.6866666666666666,150
+24,cliff swallow,0.6166666666666667,300
+25,marsh wren,0.6133333333333333,300
+26,sparrow head,0.6,250
+27,pomarine jaeger,0.568,250
+28,brown sparrow,0.6866666666666666,150
+29,long-tailed jaeger,0.576,250
+30,yellow breast with black v-shaped necklace,0.625,200
+31,yellow throat,0.43333333333333335,300
+32,barn swallow,0.628,250
+33,shiny cowbird bird,0.74,300
+34,worm eating warbler,0.64,200
+35,kentucky warbler,0.632,250
+36,black-capped vireo head,0.605,200
+37,great grey shrike,0.63,200
+38,seaside sparrow,0.6,250
+39,gray-crowned rosy finch,0.5666666666666667,300
+40,green kingfisher,0.695,200
+41,horned lark,0.65,200
+42,pileated woodpecker,0.5966666666666667,300
+43,tail feathers,0.51,200
+44,red finch,0.725,200
+45,baird's sparrow,0.7466666666666667,150
+46,horned grebe,0.66,300
+47,purple finch,0.76,150
+48,white-throated sparrow,0.5966666666666667,300
+49,yellow bird,0.58,50
+50,field sparrow,0.62,250
+51,black-footed albatross,0.6366666666666667,300
+52,common raven,0.6933333333333334,300
+53,tropical kingbird,0.6133333333333333,300
+54,brown and grey sparrow,0.66,150
+55,head stripes,0.48,300
+56,least flycatcher,0.7333333333333333,300
+57,bank swallow,0.62,200
+58,loggerhead shrike,0.69,300
+59,yellow and black oriole,0.68,150
+60,streaked breast,0.78,50
+61,common tern,0.748,250
+62,yellow head,0.79,200
+63,yellow plumage,0.5966666666666667,300
+64,fox sparrow,0.616,250
+65,avian head with dark eye line and pointed beak,0.6266666666666667,300
+66,painted bunting,0.616,250
+67,belted kingfisher,0.765,200
+68,olive-sided flycatcher,0.6533333333333333,300
+69,rusty crown,0.636,250
+70,prairie warbler,0.69,200
+71,vermilion flycatcher,0.6133333333333333,300
+72,pelagic cormorant,0.5633333333333334,300
+73,indigo bunting,0.63,300
+74,seabird,0.84,300
+75,cape may warbler,0.6733333333333333,150
+76,pine grosbeak,0.6,300
+77,mourning warbler,0.588,250
+78,palm warbler,0.64,300
+79,black bird perched in tree,0.48,300
+80,red-eyed vireo,0.84,50
+81,carolina wren,0.65,300
+82,parakeet auklet head,0.63,200
+83,yellow head and black body,0.612,250
+84,rose-breasted grosbeak,0.6033333333333334,300
+85,song sparrow,0.7,250
+86,western gull,0.8133333333333334,300
+87,cerulean warbler,0.59,300
+88,red crest and underparts,0.68,200
+89,least tern,0.62,300
+90,elegant tern,0.744,250
+91,common yellowthroat,0.628,250
+92,boat-tailed grackle,0.6166666666666667,300
+93,brewer's blackbird,0.6733333333333333,300
+94,american three-toed woodpecker,0.5933333333333334,300
+95,red-faced cormorant head,0.56,250
+96,black cap,0.64,200
+97,small bird,0.6066666666666667,300
+98,american goldfinch,0.685,200
+99,chestnut-sided warbler,0.58,300
+100,magnolia warbler,0.684,250
+101,red head and zebra-striped back,0.6166666666666667,300
+102,yellow eye,0.63,100
+103,spotted towhee,0.645,200
+104,gray catbird,0.5866666666666667,300
+105,heermann gull,0.64,200
+106,henslow's sparrow,0.672,250
+107,red bird plumage,0.48333333333333334,300
+108,bobolink,0.63,200
+109,sooty albatross,0.6,300
+110,blue jay,0.61,300
+111,red wing patch,0.64,300
+112,long-tailed jaeger in flight,0.62,250
+113,ringed kingfisher,0.6933333333333334,300
+114,bohemian waxwing,0.63,300
+115,house wren,0.66,300
+116,american white pelican,0.5633333333333334,300
+117,red legged kittiwake,0.59,300
+118,arctic tern,0.7533333333333333,300
+119,nightjar,0.5266666666666666,300
+120,yellow throat and eyebrow stripe,0.69,300
+121,crested auklet,0.6,200
+122,perched bird on branch,0.64,50
+123,ground,0.675,200
+124,glossy starling,0.6733333333333333,300
+125,clark's nutcracker,0.5966666666666667,300
+126,house sparrow,0.6166666666666667,300
+127,red eye,0.6533333333333333,300
+128,human hand,0.5333333333333333,300
+129,northern fulmar,0.6066666666666667,300
+130,tubenose seabird,0.7666666666666667,300
+131,philadelphia vireo,0.68,300
+132,brown thrasher,0.655,200
+133,chuck-will's-widow,0.6333333333333333,300
+134,flycatcher,0.65,100
+135,spotted catbird,0.56,250
+136,gray kingbird,0.6233333333333333,300
+137,rusty blackbird,0.5866666666666667,300
+138,black mask across eyes,0.5066666666666667,300
+139,ovenbird,0.6066666666666667,300
+140,hooded oriole,0.78,150
+141,yellow-billed cuckoo,0.62,300
+142,long black tail,0.57,100
+143,european goldfinch,0.616,250
+144,white-breasted nuthatch,0.59,300
+145,evening grosbeak,0.64,200
+146,canada warbler head with black necklace spots,0.7333333333333333,150
+147,clay-colored sparrow,0.6233333333333333,300
+148,northern flicker,0.62,250
+149,ivory gull,0.5966666666666667,300
+150,green bird plumage,0.6133333333333333,150
+151,olive-gray flycatcher bird,0.6633333333333333,300
+152,california gull,0.6666666666666666,300
+153,pacific loon,0.59,300
+154,cactus wren,0.5933333333333334,300
+155,summer tanager,0.6266666666666667,300
+156,orange-crowned warbler,0.66,300
+157,bird beak,0.5,250
+158,blackbird,0.53,200
+159,pied-billed grebe,0.628,250
+160,baltimore oriole,0.6766666666666666,300
+161,blue-winged warbler,0.6333333333333333,300
+162,tree swallow,0.632,250
+163,black seabird with red feet,0.73,100
+164,bewick's wren,0.7133333333333334,300
+165,downy woodpecker,0.6266666666666667,300
+166,white-breasted kingfisher,0.612,250
+167,yellow breast and face,0.7933333333333333,150
+168,anna's hummingbird,0.64,250
+169,brandt's cormorant head,0.61,300
+170,yellow underparts,0.6,300
+171,laysan albatross,0.535,200
+172,forster's tern,0.6866666666666666,300
+173,acadian flycatcher,0.65,300
+174,frigatebird,0.6033333333333334,300
+175,pine warbler,0.68,300
+176,horned puffin,0.5933333333333334,300
+177,pied kingfisher,0.6266666666666667,300
+178,mangrove cuckoo,0.56,300
+179,winter wren,0.64,300
+180,eastern meadowlark,0.76,100
+181,greater roadrunner,0.5933333333333334,300
+182,brown creeper,0.59,300
+183,bay-breasted warbler,0.59,300
+184,western wood pewee,0.71,200
+185,blue-headed vireo,0.6033333333333334,300
+186,northern mockingbird,0.5866666666666667,300
+187,red bill,0.5766666666666667,300
+188,cedar waxwing,0.6433333333333333,300
+189,brown pelican,0.59,300
+190,nashville warbler,0.66,250
+191,fish crow,0.72,300
+192,black tern,0.58,300
+193,green-tailed towhee,0.6033333333333334,300
+194,blue grosbeak,0.6733333333333333,300
+195,orange plumage,0.7066666666666667,150
+196,nelson's sparrow,0.63,300
+197,rock wren,0.5666666666666667,300
+198,yellow-rumped warbler,0.6166666666666667,300
+199,black-throated blue warbler male,0.624,250
+200,hooded merganser,0.58,300
+201,florida scrub jay,0.62,250
+202,yellow eyebrow and streaked plumage,0.64,250
+203,passerine bird,0.58,300
+204,sage thrasher,0.6066666666666667,300
+205,laysan albatross head,0.584,250
+206,hooded warbler,0.6166666666666667,300
+207,scissor-tailed flycatcher,0.5866666666666667,300
+208,red head,0.6733333333333333,300
+209,rhinoceros auklet,0.5633333333333334,300
+210,black head and throat with yellow underparts,0.76,100
+211,kingfisher,0.6766666666666666,300
+212,white-eyed vireo bird,0.7,300
+213,ruby-throated hummingbird,0.6233333333333333,300
+214,wilson's warbler,0.6733333333333333,150
+215,bird body,0.49666666666666665,300
+216,ring-billed gull,0.6266666666666667,300
+217,grasshopper sparrow,0.6266666666666667,300
+218,warbling vireo,0.6633333333333333,300
+219,red breasted merganser,0.6066666666666667,300
+220,black crown and face,0.55,300
+221,gull,0.7433333333333333,300
+222,bird,0.5,300
+223,rufous-colored hummingbird,0.6033333333333334,300
+224,eared grebe,0.648,250
+225,yellow breasted warbler,0.6166666666666667,300
+226,american crow,0.69,300
+227,louisiana waterthrush,0.7,300
+228,green violet-eared hummingbird,0.5933333333333334,300
+229,whip-poor-will,0.64,300
+230,lazuli bunting,0.63,300
+231,inca tern,0.488,250
+232,western grebe,0.6166666666666667,300
+233,tennessee warbler,0.6933333333333334,300
+234,scarlet tanager,0.6533333333333333,300
+235,american redstart,0.6033333333333334,300
+236,golden-winged warbler,0.59,300
+237,grackle,0.7166666666666667,300
+238,dark-eyed junco,0.5866666666666667,300
+239,bronzed cowbird,0.6533333333333333,150
+240,northern cardinal,0.675,200
+241,red-cockaded woodpecker,0.63,300
+242,cormorant,0.68,200
+243,glaucous-winged gull,0.71,300
+244,white neck collar,0.6466666666666666,150
+245,yellow wing bar,0.47,300
+246,black-billed cuckoo,0.6066666666666667,300
+247,hummingbird,0.6433333333333333,300
+248,yellow warbler,0.676,250
+249,white-crowned sparrow,0.6266666666666667,300
+250,nighthawk,0.696,250
+251,american pipit,0.6,300
+252,perched bird,0.45,300
+253,le conte's sparrow,0.616,250
+254,eastern towhee,0.6066666666666667,300
+255,black and yellow bird with a curved bill,0.66,300
+256,green violetear,0.645,200
+257,cuckoo,0.5533333333333333,300
+258,yellow breast,0.6833333333333333,300
+259,common nighthawk,0.6933333333333334,150
+260,yellow breast and black necklace,0.6,250
+261,brown and grey sparrow-like bird,0.68,300
+262,grey shrike,0.78,150
