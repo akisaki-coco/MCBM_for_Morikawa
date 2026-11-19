@@ -135,7 +135,7 @@ def make_grid(images, columns=5):
     return grid
 
 
-def load_batch_images(dataset_name, image_names, image_splits, indices, image_transform):
+def load_grid(dataset_name, image_names, image_splits, indices, image_transform):
     images = []
     for index in indices:
         image = load_image(
@@ -145,13 +145,7 @@ def load_batch_images(dataset_name, image_names, image_splits, indices, image_tr
         )
         image = image_transform(image)
         images.append(image)
-    return images
-
-
-def load_grid(dataset_name, image_names, image_splits, indices, image_transform):
-    return make_grid(
-        load_batch_images(dataset_name, image_names, image_splits, indices, image_transform)
-    )
+    return make_grid(images)
 
 
 def parse_predictions_json(text):
@@ -171,38 +165,6 @@ def parse_predictions_json(text):
     if any(value not in (0, 1) for value in predictions):
         raise InvalidLLMOutput(f"Labels must contain only 0 and 1, got: {text}")
     return predictions
-
-
-def parse_single_prediction_json(text):
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise InvalidLLMOutput(f"Could not parse structured single annotation output: {text}") from exc
-    if not isinstance(parsed, dict):
-        raise InvalidLLMOutput(f"Structured output must be a JSON object: {text}")
-    label = parsed.get("label")
-    if isinstance(label, bool):
-        raise InvalidLLMOutput(f"Label must be integer 0 or 1, got: {text}")
-    try:
-        label = int(label)
-    except (TypeError, ValueError) as exc:
-        raise InvalidLLMOutput(f"Label must be integer 0 or 1, got: {text}") from exc
-    if label not in (0, 1):
-        raise InvalidLLMOutput(f"Label must be 0 or 1, got: {text}")
-    return label
-
-
-SINGLE_ANNOTATION_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "label": {
-            "type": "integer",
-            "enum": [0, 1],
-        },
-    },
-    "required": ["label"],
-    "additionalProperties": False,
-}
 
 
 ANNOTATION_SCHEMA = {
@@ -234,13 +196,13 @@ GEMINI_ANNOTATION_SCHEMA = {
 }
 
 
-def call_annotator_with_retry(args, config, concept_name, reference_grid, task_grid, task_images=None):
+def call_annotator_with_retry(args, config, concept_name, reference_grid, task_grid):
     try:
-        return call_annotator(args, config, concept_name, reference_grid, task_grid, task_images=task_images)
+        return call_annotator(args, config, concept_name, reference_grid, task_grid)
     except InvalidLLMOutput as first_error:
         print(f"Invalid LLM output; retrying once. Error: {first_error}")
         try:
-            return call_annotator(args, config, concept_name, reference_grid, task_grid, task_images=task_images)
+            return call_annotator(args, config, concept_name, reference_grid, task_grid)
         except InvalidLLMOutput as second_error:
             raise InvalidLLMOutput(f"LLM output was invalid twice. Last error: {second_error}") from second_error
 
@@ -348,92 +310,62 @@ def call_gemini_annotator(args, config, concept_name, reference_grid, task_grid)
             time.sleep(GEMINI_TRANSIENT_ERROR_DELAY_SECONDS)
     return parse_predictions_json(response.text)
 
-def _call_ollama_single_image(client, model, system_prompt, reference_prompt, reference_data_url, task_prompt, task_image):
-    request_messages = [
-        {"role": "system", "content": system_prompt},
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": reference_prompt},
-                {"type": "image_url", "image_url": {"url": reference_data_url}},
-                {"type": "text", "text": task_prompt},
-                {"type": "image_url", "image_url": {"url": image_to_data_url(task_image)}},
-            ],
-        },
-    ]
-    response = client.chat.completions.create(
-        model=model,
-        messages=request_messages,
-        temperature=0,
-        max_tokens=100,
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "single_concept_annotation_output",
-                "strict": True,
-                "schema": SINGLE_ANNOTATION_SCHEMA,
-            },
-        },
-        reasoning_effort="none",
-    )
-    return parse_single_prediction_json(response.choices[0].message.content)
-
-
-def call_ollama_annotator(args, config, concept_name, reference_grid, task_images):
-    if not task_images:
-        raise ValueError("task_images must be provided when using --llm-provider ollama.")
-
+def call_ollama_annotator(args, config, concept_name, reference_grid, task_grid):
     client = OpenAI(
         base_url="http://localhost:11434/v1",
         api_key="ollama",  # ダミー用キー
     )
-    system_prompt = get_system_prompt(config)
-    reference_prompt = (
-        "We're studying neurons in a neural network. Each neuron looks for a particular concept in an image.\n"
-        f"Below are 25 reference images (not to label) that strongly contain the concept '{concept_name}'.\n"
-        "Carefully review these reference examples before starting the main task."
+
+    response = client.chat.completions.create(
+        model=args.llm_model,
+        messages=[
+            {"role": "system", "content": get_system_prompt(config)},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "We're studying neurons in a neural network. Each neuron looks for a particular concept in an image.\n"
+                            f"Below are 25 reference images (not to label) that strongly contain the concept '{concept_name}'.\n"
+                            "Carefully review these reference examples before starting the main task."
+                        ),
+                    },
+                    {"type": "image_url", "image_url": {"url": image_to_data_url(reference_grid)}},
+                    {
+                        "type": "text",
+                        "text": (
+                            f"Now, here are {IMAGES_PER_BATCH} new images in a 5x5 grid. Read left to right, top to bottom.\n"
+                            f"For each image, predict '1' if the concept '{concept_name}' is present, or '0' if absent.\n"
+                            "Return a JSON object with one key, labels, containing the 25 labels in order."
+                        ),
+                    },
+                    {"type": "image_url", "image_url": {"url": image_to_data_url(task_grid)}},
+                ],
+            },
+        ],
+        temperature=0,
+        max_tokens=10000,
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "concept_annotation_output",
+                "strict": True,
+                "schema": ANNOTATION_SCHEMA,
+            },
+        },
+        reasoning_effort="none",
     )
-    reference_data_url = image_to_data_url(reference_grid)
-    task_prompt = (
-        "Now, here is 1 new image to evaluate.\n"
-        f"Predict '1' if the concept '{concept_name}' is present in this image, or '0' if absent.\n"
-        "Return a JSON object with one key, label, set to 1 or 0."
-    )
-
-    predictions = []
-    for image_idx, task_image in enumerate(task_images):
-        try:
-            label = _call_ollama_single_image(
-                client,
-                args.llm_model,
-                system_prompt,
-                reference_prompt,
-                reference_data_url,
-                task_prompt,
-                task_image,
-            )
-        except InvalidLLMOutput as first_error:
-            print(f"Invalid single-image LLM output at index {image_idx}; retrying once. Error: {first_error}")
-            label = _call_ollama_single_image(
-                client,
-                args.llm_model,
-                system_prompt,
-                reference_prompt,
-                reference_data_url,
-                task_prompt,
-                task_image,
-            )
-        predictions.append(label)
-    return predictions
+    return parse_predictions_json(response.choices[0].message.content)
 
 
-def call_annotator(args, config, concept_name, reference_grid, task_grid, task_images=None):
+def call_annotator(args, config, concept_name, reference_grid, task_grid):
     if args.llm_provider == "openai":
         return call_openai_annotator(args, config, concept_name, reference_grid, task_grid)
     if args.llm_provider == "gemini":
         return call_gemini_annotator(args, config, concept_name, reference_grid, task_grid)
     if args.llm_provider == "ollama":
-        return call_ollama_annotator(args, config, concept_name, reference_grid, task_images)
+        return call_ollama_annotator(args, config, concept_name, reference_grid, task_grid)
     raise ValueError(f"Unsupported LLM provider: {args.llm_provider}")
 
 
@@ -1008,8 +940,7 @@ def annotate_concepts(config, args, activation_dir, sae_dir, concepts_path, devi
             llm_labels = []
             expected_labels = []
             for batch_index, (batch_indices, batch_labels) in enumerate(batches):
-                task_images = load_batch_images(config["dataset"], image_names, image_splits, batch_indices, image_transform)
-                task_grid = make_grid(task_images)
+                task_grid = load_grid(config["dataset"], image_names, image_splits, batch_indices, image_transform)
                 save_grid_if_requested(args, run_dir, split, concept_id, batch_index, reference_grid, task_grid)
                 predictions = call_annotator_with_retry(
                     args,
@@ -1017,7 +948,6 @@ def annotate_concepts(config, args, activation_dir, sae_dir, concepts_path, devi
                     concept["concept_name"],
                     reference_grid,
                     task_grid,
-                    task_images=task_images,
                 )
                 all_images.extend([image_names[index] for index in batch_indices])
                 llm_labels.extend(predictions)
