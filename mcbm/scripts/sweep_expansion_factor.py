@@ -19,7 +19,10 @@ from mcbm.scripts.merge_concepts import (
     save_merged_output,
 )
 from mcbm.scripts.name_concepts import (
+    load_kept_indices,
     name_concepts,
+    parse_units,
+    read_existing_names,
     resolve_api_key,
     validate_llm_options,
 )
@@ -28,7 +31,7 @@ from mcbm.scripts.train_sae import require_sae_config, train_sae
 
 DEFAULT_EXPANSION_FACTORS = "0.25,0.5,1,2,4,8"
 DEFAULT_LLM_MODEL = "qwen3.5:27b"
-DEFAULT_EMBEDDING_MODEL = "qwen3-embedding:8b"
+DEFAULT_EMBEDDING_MODEL = "qwen3-embedding:0.6b"
 
 SUMMARY_FIELDNAMES = [
     "sae_expansion_factor",
@@ -104,6 +107,11 @@ def parse_args():
     parser.add_argument("--thinking-level", choices=["minimal", "low", "medium", "high"])
     parser.add_argument("--save-images", action="store_true", help="Save naming and annotation debug images.")
     parser.add_argument("--units", help="Comma-separated post-pruning unit ids to name, e.g. 1,2,3.")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Reuse existing completed/in-progress SAE, concept, and annotation directories for each factor.",
+    )
     return parser.parse_args()
 
 
@@ -189,6 +197,103 @@ def build_step_dirs(config, args, factor_tag):
         Path("outputs") / "annotations" / dataset / f"annotations_{dataset}_{model_name}_ef{factor_tag}_{timestamp}"
     )
     return sae_dir, concept_dir, annotation_dir
+
+
+def _paths_match(path_a, path_b):
+    if not path_a or not path_b:
+        return False
+    return Path(path_a).resolve() == Path(path_b).resolve()
+
+
+def _read_run_info_if_valid(run_dir):
+    path = Path(run_dir) / "run_info.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _find_latest_matching_dir(parent, pattern, run_info_key, expected_path, predicate=None):
+    if not parent.exists():
+        return None
+    for candidate in sorted(parent.glob(pattern), key=lambda p: p.name, reverse=True):
+        if not candidate.is_dir():
+            continue
+        if predicate is not None and not predicate(candidate):
+            continue
+        run_info = _read_run_info_if_valid(candidate)
+        if run_info is not None and _paths_match(run_info.get(run_info_key), expected_path):
+            return candidate
+    return None
+
+
+def _is_completed_sae_dir(candidate):
+    return (
+        (candidate / "metrics.json").exists()
+        and (candidate / "pruning" / "kept_indices.pt").exists()
+        and len(list(candidate.glob("*.pt"))) == 1
+    )
+
+
+def find_resumable_sae_dir(config, factor_tag, activation_dir):
+    """Return the newest completed SAE directory matching this factor and activation_dir."""
+    dataset = config["dataset"]
+    backbone = config["backbone"]
+    feature_layer = config["feature_layer"].replace(".", "_")
+    return _find_latest_matching_dir(
+        Path("outputs") / "sae" / dataset,
+        f"sae_{dataset}_{backbone}_{feature_layer}_ef{factor_tag}_*",
+        "activation_dir",
+        activation_dir,
+        predicate=_is_completed_sae_dir,
+    )
+
+
+def find_resumable_concept_dir(config, args, factor_tag, sae_dir):
+    """Return the newest concept directory matching this factor and sae_dir."""
+    dataset = config["dataset"]
+    model_name = sanitize_model_name(args.llm_provider, args.llm_model)
+    return _find_latest_matching_dir(
+        Path("outputs") / "concepts" / dataset,
+        f"concepts_{dataset}_{model_name}_ef{factor_tag}_*",
+        "sae_dir",
+        sae_dir,
+    )
+
+
+def is_concept_naming_complete(sae_dir, concept_dir, units_arg):
+    """Check whether all target post-pruning units already appear in concept_names.csv."""
+    names_path = Path(concept_dir) / "concept_names.csv"
+    if not names_path.exists():
+        return False
+
+    kept_indices = load_kept_indices(sae_dir)
+    requested_units = parse_units(units_arg)
+    if requested_units is not None:
+        available_units = set(range(int(kept_indices.numel())))
+        missing_units = sorted(requested_units - available_units)
+        if missing_units:
+            raise ValueError(f"Requested units are outside the post-pruning range: {missing_units}")
+        expected_units = requested_units
+    else:
+        expected_units = set(range(int(kept_indices.numel())))
+
+    existing_names = read_existing_names(names_path)
+    return expected_units.issubset(existing_names.keys())
+
+
+def find_resumable_annotation_dir(config, args, factor_tag, concept_dir):
+    """Return the newest annotation directory matching this factor and concept_dir."""
+    dataset = config["dataset"]
+    model_name = sanitize_model_name(args.llm_provider, args.llm_model)
+    return _find_latest_matching_dir(
+        Path("outputs") / "annotations" / dataset,
+        f"annotations_{dataset}_{model_name}_ef{factor_tag}_*",
+        "concept_dir",
+        concept_dir,
+    )
 
 
 def run_merge_with_fallback(factor_config, concept_dir, embedding_provider, embedding_model):
@@ -312,6 +417,7 @@ def run_sweep(args):
         "thinking_level": args.thinking_level,
         "save_images": bool(args.save_images),
         "units": args.units,
+        "resume": bool(args.resume),
         "started_at": datetime.now().isoformat(),
     }
     (sweep_dir / "run_info.json").write_text(json.dumps(run_info, indent=2))
@@ -325,7 +431,26 @@ def run_sweep(args):
         factor_config_path = configs_dir / f"config_ef_{factor_tag}.json"
         factor_config_path.write_text(json.dumps(factor_config, indent=4))
 
-        sae_dir, concept_dir, annotation_dir = build_step_dirs(factor_config, args, factor_tag)
+        default_sae_dir, default_concept_dir, default_annotation_dir = build_step_dirs(
+            factor_config, args, factor_tag
+        )
+
+        resumed_sae = find_resumable_sae_dir(factor_config, factor_tag, activation_dir) if args.resume else None
+        sae_dir = resumed_sae if resumed_sae is not None else default_sae_dir
+
+        resumed_concept = (
+            find_resumable_concept_dir(factor_config, args, factor_tag, sae_dir)
+            if (args.resume and resumed_sae is not None)
+            else None
+        )
+        concept_dir = resumed_concept if resumed_concept is not None else default_concept_dir
+
+        resumed_annotation = (
+            find_resumable_annotation_dir(factor_config, args, factor_tag, concept_dir)
+            if (args.resume and resumed_concept is not None)
+            else None
+        )
+        annotation_dir = resumed_annotation if resumed_annotation is not None else default_annotation_dir
 
         print(f"\n[{index}/{len(factors)}] Starting sweep for sae_expansion_factor={factor}")
         print(f"Config: {factor_config_path}")
@@ -333,29 +458,43 @@ def run_sweep(args):
         print(f"Concept dir: {concept_dir}")
         print(f"Annotation dir: {annotation_dir}")
 
-        train_sae(factor_config, factor_config_path, activation_dir, sae_dir, device)
+        if resumed_sae is not None:
+            print(f"[resume] Reusing completed SAE dir: {sae_dir}")
+        else:
+            train_sae(factor_config, factor_config_path, activation_dir, sae_dir, device)
 
-        namer_args = argparse.Namespace(
-            config=str(factor_config_path),
-            sae_dir=str(sae_dir),
-            output_dir=str(concept_dir),
-            device=args.device,
-            save_images=args.save_images,
-            llm_provider=args.llm_provider,
-            llm_model=args.llm_model,
-            reasoning_effort=args.reasoning_effort,
-            thinking_level=args.thinking_level,
-            units=args.units,
-        )
-        name_concepts(factor_config, namer_args, activation_dir, device)
+        if resumed_concept is not None and is_concept_naming_complete(sae_dir, concept_dir, args.units):
+            print(f"[resume] Skipping concept naming (all units already named in {concept_dir / 'concept_names.csv'}).")
+        else:
+            if resumed_concept is not None:
+                print(f"[resume] Resuming concept naming in {concept_dir}")
+            namer_args = argparse.Namespace(
+                config=str(factor_config_path),
+                sae_dir=str(sae_dir),
+                output_dir=str(concept_dir),
+                device=args.device,
+                save_images=args.save_images,
+                llm_provider=args.llm_provider,
+                llm_model=args.llm_model,
+                reasoning_effort=args.reasoning_effort,
+                thinking_level=args.thinking_level,
+                units=args.units,
+            )
+            name_concepts(factor_config, namer_args, activation_dir, device)
 
-        run_merge_with_fallback(
-            factor_config,
-            concept_dir,
-            args.embedding_provider,
-            args.embedding_model,
-        )
+        merged_csv_path = concept_dir / "concept_names_merged.csv"
+        if args.resume and merged_csv_path.exists():
+            print(f"[resume] Skipping concept merging ({merged_csv_path} already exists).")
+        else:
+            run_merge_with_fallback(
+                factor_config,
+                concept_dir,
+                args.embedding_provider,
+                args.embedding_model,
+            )
 
+        if resumed_annotation is not None:
+            print(f"[resume] Resuming annotation in {annotation_dir}")
         # name_concepts filters by post-pruning unit ids, while merge_concepts renumbers
         # merged concepts from 0, so annotate_concepts always annotates all merged concepts.
         annotator_args = argparse.Namespace(
@@ -376,7 +515,7 @@ def run_sweep(args):
             annotator_args,
             activation_dir,
             sae_dir,
-            concept_dir / "concept_names_merged.csv",
+            merged_csv_path,
             device,
         )
 
