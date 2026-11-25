@@ -32,7 +32,7 @@ from mcbm.scripts.sweep_expansion_factor import read_annotation_stats, sanitize_
 
 
 DEFAULT_THRESHOLDS = "0.70,0.75,0.80,0.85,0.88,0.90,0.92,0.95,0.98"
-DEFAULT_EMBEDDING_MODEL = "qwen3-embedding:0.6b"
+DEFAULT_EMBEDDING_MODEL = "qwen3-embedding:8b"
 DEFAULT_LLM_MODEL = "qwen3.5:27b"
 
 SUMMARY_FIELDNAMES = [
