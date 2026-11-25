@@ -1,6 +1,7 @@
 import argparse
 import csv
 import json
+from datetime import datetime
 from pathlib import Path
 
 import matplotlib
@@ -50,7 +51,10 @@ def parse_args():
         nargs="+",
         help="One or more sweep_summary.csv paths produced by sweep_expansion_factor.py or sweep_merge_threshold.py.",
     )
-    parser.add_argument("--output-dir", help="Output directory (default: outputs/analysis/unit_count_vs_agreement).")
+    parser.add_argument(
+        "--output-dir",
+        help="Output directory (default: outputs/analysis/unit_count_vs_agreement/<timestamp>).",
+    )
     return parser.parse_args()
 
 
@@ -253,9 +257,10 @@ def print_report(rows):
                 )
 
 
-def save_outputs(rows, output_dir):
+def save_outputs(rows, output_dir, timestamp, args):
     output_dir.mkdir(parents=True, exist_ok=True)
-    with (output_dir / "unit_count_vs_agreement.csv").open("w", newline="") as f:
+    csv_path = output_dir / f"unit_count_vs_agreement_{timestamp}.csv"
+    with csv_path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=ROW_FIELDNAMES)
         writer.writeheader()
         for row in rows:
@@ -288,8 +293,19 @@ def save_outputs(rows, output_dir):
         axis.legend(loc="best")
     axes[0].set_ylabel("llm_sae_agreement")
     plt.tight_layout()
-    plt.savefig(output_dir / "unit_count_vs_agreement.png", dpi=150)
+    png_path = output_dir / f"unit_count_vs_agreement_{timestamp}.png"
+    plt.savefig(png_path, dpi=150)
     plt.close(fig)
+
+    run_info_path = output_dir / f"run_info_{timestamp}.json"
+    run_info = {
+        "timestamp": timestamp,
+        "annotation_dir": args.annotation_dir,
+        "concept_dir": args.concept_dir,
+        "sweep_summary": args.sweep_summary,
+    }
+    run_info_path.write_text(json.dumps(run_info, indent=2))
+    return csv_path, png_path, run_info_path
 
 
 def main():
@@ -297,9 +313,17 @@ def main():
     entries = resolve_run_entries(args)
     rows = collect_rows(entries)
     print_report(rows)
-    output_dir = Path(args.output_dir) if args.output_dir else Path("outputs") / "analysis" / "unit_count_vs_agreement"
-    save_outputs(rows, output_dir)
-    print(f"\nSaved per-concept table and scatter plot to {output_dir}")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = (
+        Path(args.output_dir)
+        if args.output_dir
+        else Path("outputs") / "analysis" / "unit_count_vs_agreement" / timestamp
+    )
+    csv_path, png_path, run_info_path = save_outputs(rows, output_dir, timestamp, args)
+    print(f"\nSaved analysis outputs to {output_dir}:")
+    print(f"- {csv_path.name}")
+    print(f"- {png_path.name}")
+    print(f"- {run_info_path.name}")
 
 
 if __name__ == "__main__":
